@@ -93,6 +93,18 @@ High level:
 
 Note: the current “trigger waits synchronously for completion” implementation relies on an in-memory waiter, so it’s intentionally single-instance.
 
+### No AWS credentials: synchronous execution (no queue)
+
+If `AWS_ACCESS_KEY_ID` is **blank / not provided**, the server will **not** use SQS at all.
+Instead, workflow triggers execute **synchronously in the Node.js process** and return the result directly.
+
+This is useful when you don’t want AWS/LocalStack credentials locally.
+
+To enable queueing via LocalStack SQS again, set both:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+
 ## Smoke Testing
 1. Create a workflow: `POST http://localhost:3000/api/workflows`
 2. Trigger it: `POST http://localhost:3000/t/<token>`
