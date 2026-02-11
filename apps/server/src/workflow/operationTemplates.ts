@@ -11,8 +11,7 @@ type TemplateRow = {
   callbackType: string;
   visibility: string;
   created_by: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  attributes: any;
+  attributes: unknown;
 };
 
 export async function expandOperationTemplates(params: {

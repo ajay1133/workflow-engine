@@ -63,7 +63,7 @@ async function main() {
                 data: {
                   status: RUN_STATUS.failed,
                   finishedAt: new Date(result.finishedAt),
-                  error: result.error as any,
+                  error: result.error as Prisma.InputJsonValue,
                 },
               });
 
@@ -92,7 +92,7 @@ async function main() {
                 data: {
                   status: RUN_STATUS.failed,
                   finishedAt: new Date(finishedAtIso),
-                  error: error as any,
+                  error: error as Prisma.InputJsonValue,
                 },
               });
 
@@ -128,7 +128,7 @@ async function main() {
                 data: {
                   status: RUN_STATUS.failed,
                   finishedAt: new Date(finishedAtIso),
-                  error: error as any,
+                  error: error as Prisma.InputJsonValue,
                 },
               });
 
@@ -167,11 +167,11 @@ async function main() {
               data: {
                 status: finalStatus,
                 finishedAt: new Date(finishedAtIso),
-                ctxFinal: engineResult.ctx as any,
-                executionTrace: engineResult.trace as any,
+                ctxFinal: engineResult.ctx as Prisma.InputJsonValue,
+                executionTrace: engineResult.trace as Prisma.InputJsonValue,
                 error:
                   engineResult.status === 'failed'
-                    ? (engineResult.error as any)
+                    ? (engineResult.error as Prisma.InputJsonValue)
                     : undefined,
               },
             });

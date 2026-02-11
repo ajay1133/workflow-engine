@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type { Router } from 'express';
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -8,7 +8,7 @@ import { ENV_KEYS, ROUTES } from '../constants';
 import type { AppEnv } from '../env';
 import { forbidden, notFound, serviceUnavailable } from '../httpErrors';
 import type { RunWaiter } from '../queue/runWaiter';
-import type { QueueRunRequest } from '../queue/types';
+import type { QueueRunRequest, QueueRunResult } from '../queue/types';
 import { RUN_STATUS } from '../workflow/types';
 
 export function triggerRouter(params: {
@@ -46,7 +46,7 @@ export function triggerRouter(params: {
       data: {
         workflowId: workflow.id,
         status: RUN_STATUS.running,
-        input: input as any,
+        input: input as Prisma.InputJsonValue,
       },
     });
 
@@ -74,13 +74,13 @@ export function triggerRouter(params: {
     );
 
     try {
-      const result = await runWaiter.waitFor(correlationId, env[ENV_KEYS.triggerSyncTimeoutMs]);
+      const result: QueueRunResult = await runWaiter.waitFor(correlationId, env[ENV_KEYS.triggerSyncTimeoutMs]);
       return res.json({
         runId: run.id,
         status: result.status,
         error: result.error ?? null,
-        ctxFinal: (result as any).ctxFinal ?? null,
-        workflowExecutionSteps: (result as any).workflowExecutionSteps ?? null,
+        ctxFinal: result.ctxFinal ?? null,
+        workflowExecutionSteps: result.workflowExecutionSteps ?? null,
       });
     } catch (err) {
       return res.json({

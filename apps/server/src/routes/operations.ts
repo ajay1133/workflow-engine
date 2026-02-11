@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type { Router } from 'express';
 import express from 'express';
 import { z } from 'zod';
@@ -51,7 +51,7 @@ export function operationsRouter(params: { prisma: PrismaClient }): Router {
     });
 
     res.json(
-      rows.map((r: any) => ({
+      rows.map((r) => ({
         id: r.id,
         op: r.op,
         visibility: r.visibility,
@@ -120,7 +120,7 @@ export function operationsRouter(params: { prisma: PrismaClient }): Router {
           op: parsed.data.op,
           visibility: parsed.data.visibility,
           callbackType: parsed.data.callbackType,
-          attributes: parsed.data.attributes as any,
+          attributes: parsed.data.attributes as Prisma.InputJsonValue,
           created_by: userId,
         },
       });
@@ -136,7 +136,7 @@ export function operationsRouter(params: { prisma: PrismaClient }): Router {
         createdAt: created.createdAt,
         updatedAt: created.updatedAt,
       });
-    } catch (e) {
+    } catch {
       const err = badRequest('Invalid operation payload', { op: ['op must be globally unique'] });
       return res.status(err.status).json(err.body);
     }
@@ -170,7 +170,9 @@ export function operationsRouter(params: { prisma: PrismaClient }): Router {
       data: {
         ...(parsed.data.visibility !== undefined ? { visibility: parsed.data.visibility } : {}),
         ...(parsed.data.callbackType !== undefined ? { callbackType: parsed.data.callbackType } : {}),
-        ...(parsed.data.attributes !== undefined ? { attributes: parsed.data.attributes as any } : {}),
+        ...(parsed.data.attributes !== undefined
+          ? { attributes: parsed.data.attributes as Prisma.InputJsonValue }
+          : {}),
       },
     });
 

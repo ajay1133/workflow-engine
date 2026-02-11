@@ -79,6 +79,7 @@ export function runsRouter(params: { prisma: PrismaClient }): Router {
 
     // strip workflow relation from response
     const { workflow, ...rest } = run;
+    void workflow;
     return res.json(rest);
   });
 

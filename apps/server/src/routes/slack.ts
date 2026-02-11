@@ -25,7 +25,7 @@ const slackWebhookOrEnvSchema = z
   .min(1)
   .refine((raw) => {
     const value = raw.trim();
-    if (value.startsWith('env:')) return value.slice('env:'.length).trim().length > 0;
+    if (value.startsWith('env:')) return value === `env:${ENV_KEYS.slackWebhookUrl}`;
     return slackWebhookUrlSchema.safeParse(value).success;
   }, 'Invalid Slack webhook url');
 
@@ -39,8 +39,8 @@ const testSlackSchema = z.object({
 function resolveEnvUrl(raw: string, env: AppEnv): string | null {
   const value = raw.trim();
   if (!value.startsWith('env:')) return value;
-  const key = value.slice('env:'.length).trim();
-  const resolved = (env as any)?.[key];
+  if (value !== `env:${ENV_KEYS.slackWebhookUrl}`) return null;
+  const resolved = env[ENV_KEYS.slackWebhookUrl];
   return typeof resolved === 'string' && resolved.trim() ? resolved.trim() : null;
 }
 

@@ -100,7 +100,9 @@ function formatErrorMessage(err: unknown): string {
 function getErrorName(err: unknown): string | undefined {
   if (!err) return undefined;
   if (err instanceof Error && err.name) return err.name;
-  const anyErr = err as any;
-  if (typeof anyErr?.name === 'string') return anyErr.name;
+  if (typeof err === 'object' && 'name' in err) {
+    const name = (err as { name?: unknown }).name;
+    if (typeof name === 'string') return name;
+  }
   return undefined;
 }

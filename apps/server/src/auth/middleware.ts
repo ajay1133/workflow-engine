@@ -9,12 +9,10 @@ export type AuthedUser = {
   is_admin: boolean;
 };
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthedUser;
-      jwt?: JwtUserPayload;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: AuthedUser;
+    jwt?: JwtUserPayload;
   }
 }
 

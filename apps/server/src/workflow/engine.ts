@@ -117,7 +117,7 @@ export async function runWorkflowSteps(params: {
     if (op.action === ACTION_TYPE.send_http_request) {
       const headers = op.headers ? (deepTemplate(op.headers, ctx) as Record<string, string>) : undefined;
 
-      const urlRaw = typeof (op as any).url === 'string' && (op as any).url.trim().length > 0 ? (op as any).url : 'env:SLACK_WEBHOOK_URL';
+      const urlRaw = op.url && op.url.trim().length > 0 ? op.url : 'env:SLACK_WEBHOOK_URL';
 
       const resolvedUrl = resolveEnvUrl(urlRaw);
       if (!resolvedUrl.ok) {
@@ -155,10 +155,10 @@ export async function runWorkflowSteps(params: {
 
       if (result.bodyText !== undefined) {
         const parsed = tryParseJson(result.bodyText);
-        (ctx as any).send_http_status = result.status;
-        (ctx as any).send_http_ok = result.ok;
-        (ctx as any).send_http_response = parsed ?? result.bodyText;
-        (ctx as any).send_http_retries_used = result.retriesUsed;
+        ctx['send_http_status'] = result.status;
+        ctx['send_http_ok'] = result.ok;
+        ctx['send_http_response'] = parsed ?? result.bodyText;
+        ctx['send_http_retries_used'] = result.retriesUsed;
       }
 
       workflowExecutionSteps.push({
@@ -361,8 +361,7 @@ export async function runWorkflowSteps(params: {
 function cloneCtx(ctx: Ctx): Record<string, unknown> {
   try {
     // structuredClone exists in Node 18+; but ctx may include non-cloneable values.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sc = (globalThis as any).structuredClone as ((v: unknown) => unknown) | undefined;
+    const sc = (globalThis as unknown as { structuredClone?: (v: unknown) => unknown }).structuredClone;
     if (typeof sc === 'function') return sc(ctx) as Record<string, unknown>;
   } catch {
     // fall through
@@ -458,17 +457,22 @@ type NormalizedOperation =
   | { action: typeof ACTION_TYPE.while_end }
   | { action: typeof ACTION_TYPE.create_or_update; key: string; increment_by: unknown; default_value: unknown };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function normalizeToOperations(items: WorkflowStep[]): NormalizedOperation[] {
   const out: NormalizedOperation[] = [];
 
-  for (const item of items as any[]) {
-    if (item && typeof item === 'object' && typeof item.action === 'string') {
-      out.push(item as NormalizedOperation);
+  for (const raw of items as unknown[]) {
+    if (isRecord(raw) && typeof raw.action === 'string') {
+      out.push(raw as unknown as NormalizedOperation);
       continue;
     }
 
-    if (item && typeof item === 'object' && typeof item.type === 'string') {
-      const t = item.type === 'fetch.http_request' ? ACTION_TYPE.send_http_request : item.type;
+    if (isRecord(raw) && typeof raw.type === 'string') {
+      const rawType = raw.type;
+      const t = rawType === 'fetch.http_request' ? ACTION_TYPE.send_http_request : rawType;
       if (
         t === ACTION_TYPE.filter_compare ||
         t === ACTION_TYPE.transform_default_value ||
@@ -481,44 +485,57 @@ function normalizeToOperations(items: WorkflowStep[]): NormalizedOperation[] {
         t === ACTION_TYPE.while_end ||
         t === ACTION_TYPE.create_or_update
       ) {
-        out.push({ ...item, action: t } as NormalizedOperation);
+        out.push({ ...raw, action: t } as unknown as NormalizedOperation);
         continue;
       }
     }
 
     // Legacy grouped step shapes
-    if (item && typeof item === 'object' && item.type === STEP_TYPE.filter) {
-      const ops = Array.isArray(item.ops) ? item.ops : Array.isArray(item.conditions) ? item.conditions : [];
+    if (isRecord(raw) && raw.type === STEP_TYPE.filter) {
+      const ops = Array.isArray(raw.ops) ? raw.ops : Array.isArray(raw.conditions) ? raw.conditions : [];
       for (const c of ops) {
-        out.push({ action: ACTION_TYPE.filter_compare, key: c.path, condition: c.op, value: c.value });
+        if (!isRecord(c)) continue;
+        out.push({
+          action: ACTION_TYPE.filter_compare,
+          key: String(c.path ?? ''),
+          condition: String(c.op ?? ''),
+          value: c.value,
+        });
       }
       continue;
     }
 
-    if (item && typeof item === 'object' && item.type === STEP_TYPE.transform) {
-      const ops = Array.isArray(item.ops) ? item.ops : [];
+    if (isRecord(raw) && raw.type === STEP_TYPE.transform) {
+      const ops = Array.isArray(raw.ops) ? raw.ops : [];
       for (const op of ops) {
-        if (!op || typeof op !== 'object') continue;
+        if (!isRecord(op)) continue;
         if (op.op === 'default') {
-          out.push({ action: ACTION_TYPE.transform_default_value, key: op.path, value: op.value });
+          out.push({ action: ACTION_TYPE.transform_default_value, key: String(op.path ?? ''), value: op.value });
         } else if (op.op === 'template') {
-          out.push({ action: ACTION_TYPE.transform_replace_template, key: op.to, value: op.template });
+          out.push({
+            action: ACTION_TYPE.transform_replace_template,
+            key: String(op.to ?? ''),
+            value: String(op.template ?? ''),
+          });
         } else if (op.op === 'pick') {
-          out.push({ action: ACTION_TYPE.transform_pick, value: op.paths });
+          out.push({
+            action: ACTION_TYPE.transform_pick,
+            value: Array.isArray(op.paths) ? op.paths.map((p) => String(p)) : [],
+          });
         }
       }
       continue;
     }
 
-    if (item && typeof item === 'object' && item.type === STEP_TYPE.http_request) {
+    if (isRecord(raw) && raw.type === STEP_TYPE.http_request) {
       out.push({
         action: ACTION_TYPE.send_http_request,
-        method: item.method,
-        url: item.url,
-        headers: item.headers,
-        body: item.body,
-        timeoutMs: item.timeoutMs,
-        retries: item.retries,
+        method: String(raw.method ?? 'POST') as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+        url: String(raw.url ?? ''),
+        headers: isRecord(raw.headers) ? (raw.headers as Record<string, string>) : undefined,
+        body: raw.body as unknown as { mode: 'ctx' } | { mode: 'custom'; value: unknown } | undefined,
+        timeoutMs: typeof raw.timeoutMs === 'number' ? raw.timeoutMs : undefined,
+        retries: typeof raw.retries === 'number' ? raw.retries : undefined,
       });
       continue;
     }

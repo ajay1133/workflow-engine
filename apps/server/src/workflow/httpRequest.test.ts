@@ -1,6 +1,12 @@
 import { executeHttpRequest } from './httpRequest';
 
-function res(status: number, bodyText = ''): any {
+type FetchResponse = {
+  ok: boolean;
+  status: number;
+  text: () => Promise<string>;
+};
+
+function res(status: number, bodyText = ''): FetchResponse {
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -20,8 +26,8 @@ describe('executeHttpRequest retries', () => {
 
   test('default retries is 0 (single attempt)', async () => {
     const fetchMock = jest
-      .spyOn(globalThis as any, 'fetch')
-      .mockResolvedValueOnce(res(500, 'nope'));
+      .spyOn(globalThis as unknown as { fetch: typeof fetch }, 'fetch')
+      .mockResolvedValueOnce(res(500, 'nope') as unknown as Response);
 
     const promise = executeHttpRequest({
       step: {
@@ -45,10 +51,10 @@ describe('executeHttpRequest retries', () => {
 
   test('retries on 5xx up to max retries', async () => {
     const fetchMock = jest
-      .spyOn(globalThis as any, 'fetch')
-      .mockResolvedValueOnce(res(500, 'e1'))
-      .mockResolvedValueOnce(res(500, 'e2'))
-      .mockResolvedValueOnce(res(500, 'e3'));
+      .spyOn(globalThis as unknown as { fetch: typeof fetch }, 'fetch')
+      .mockResolvedValueOnce(res(500, 'e1') as unknown as Response)
+      .mockResolvedValueOnce(res(500, 'e2') as unknown as Response)
+      .mockResolvedValueOnce(res(500, 'e3') as unknown as Response);
 
     const promise = executeHttpRequest({
       step: {
@@ -72,9 +78,9 @@ describe('executeHttpRequest retries', () => {
 
   test('retries on 4xx and can succeed later', async () => {
     const fetchMock = jest
-      .spyOn(globalThis as any, 'fetch')
-      .mockResolvedValueOnce(res(400, 'bad request'))
-      .mockResolvedValueOnce(res(200, 'ok'));
+      .spyOn(globalThis as unknown as { fetch: typeof fetch }, 'fetch')
+      .mockResolvedValueOnce(res(400, 'bad request') as unknown as Response)
+      .mockResolvedValueOnce(res(200, 'ok') as unknown as Response);
 
     const promise = executeHttpRequest({
       step: {
@@ -96,7 +102,7 @@ describe('executeHttpRequest retries', () => {
 
   test('retries on network errors and reports no-response failure', async () => {
     const fetchMock = jest
-      .spyOn(globalThis as any, 'fetch')
+      .spyOn(globalThis as unknown as { fetch: typeof fetch }, 'fetch')
       .mockRejectedValueOnce(new TypeError('fetch failed'))
       .mockRejectedValueOnce(new TypeError('fetch failed again'));
 

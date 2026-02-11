@@ -207,8 +207,16 @@ export const workflowStepsSchema = z
     const stack: Array<{ kind: 'if' | 'while'; index: number }> = [];
 
     for (let index = 0; index < steps.length; index++) {
-      const step: any = steps[index] as any;
-      const action = step?.action ?? step?.type;
+      const step: unknown = steps[index];
+      const action =
+        step && typeof step === 'object'
+          ? (() => {
+              const rec = step as Record<string, unknown>;
+              if (typeof rec.action === 'string') return rec.action;
+              if (typeof rec.type === 'string') return rec.type;
+              return undefined;
+            })()
+          : undefined;
 
       if (action === ACTION_TYPE.if_start) {
         stack.push({ kind: 'if', index });

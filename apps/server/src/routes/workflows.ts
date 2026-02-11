@@ -1,7 +1,6 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient, Workflow } from '@prisma/client';
 import type { Router } from 'express';
 import express from 'express';
-import { Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { badRequest, notFound } from '../httpErrors';
 import { createWorkflowBodySchema, updateWorkflowBodySchema } from '../workflow/validation';
@@ -42,14 +41,17 @@ async function suggestNextWorkflowName(prisma: PrismaClient, userId: string): Pr
 }
 
 function isUniqueConstraintError(err: unknown): boolean {
-  return !!err && typeof err === 'object' && (err as any).code === 'P2002';
+  if (!err || typeof err !== 'object') return false;
+  if (!('code' in err)) return false;
+  const code = (err as { code?: unknown }).code;
+  return code === 'P2002';
 }
 
 export function workflowsRouter(params: { prisma: PrismaClient; env: AppEnv }): Router {
   const router = express.Router();
   const { prisma, env } = params;
 
-  function withTriggerShape(w: any) {
+  function withTriggerShape<T extends { triggerPath: string }>(w: T) {
     return {
       ...w,
       trigger: {
@@ -110,7 +112,7 @@ export function workflowsRouter(params: { prisma: PrismaClient; env: AppEnv }): 
     // If the client didn't provide an id, we may race with another create.
     // Retry a few times on unique constraint collisions.
     const maxAttempts = requestedId ? 1 : 10;
-    let created: any = null;
+    let created: Workflow | null = null;
     let lastErr: unknown = null;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -131,7 +133,7 @@ export function workflowsRouter(params: { prisma: PrismaClient; env: AppEnv }): 
             name: parsed.data.name,
             enabled: parsed.data.enabled,
             triggerPath: randomTriggerPath(),
-            steps: parsed.data.steps as any,
+            steps: parsed.data.steps as Prisma.InputJsonValue,
             created_by: userId,
           },
         });
@@ -181,7 +183,7 @@ export function workflowsRouter(params: { prisma: PrismaClient; env: AppEnv }): 
         ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
         ...(parsed.data.enabled !== undefined ? { enabled: parsed.data.enabled } : {}),
         ...(parsed.data.steps !== undefined
-          ? { steps: parsed.data.steps as any }
+          ? { steps: parsed.data.steps as Prisma.InputJsonValue }
           : {}),
       },
     });
