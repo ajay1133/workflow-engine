@@ -26,8 +26,10 @@ services:
       - key: JWT_SECRET
         generateValue: true
 
-      # Queue/Worker
-      # Option A (recommended): use real AWS SQS (set these as secrets)
+      # Execution mode
+      # Option A (recommended): use real AWS SQS (set credentials as secrets)
+      # - WORKER_ENABLED=true starts an SQS worker (only if credentials are set)
+      # - Triggers enqueue to SQS and wait for completion (single-instance waiter)
       - key: WORKER_ENABLED
         value: "true"
       - key: AWS_REGION
@@ -37,7 +39,6 @@ services:
       - key: AWS_SECRET_ACCESS_KEY
         sync: false
 
-      # If you *don't* want queues yet, set WORKER_ENABLED=false.
-      # Note: triggers won't run without a queue.
-      # - key: WORKER_ENABLED
-      #   value: "false"
+      # Option B: no AWS credentials (no queue)
+      # Leave AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY blank and triggers will
+      # execute synchronously in the Node.js process.

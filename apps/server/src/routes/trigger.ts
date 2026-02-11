@@ -10,6 +10,7 @@ import { forbidden, notFound, serviceUnavailable } from '../httpErrors';
 import type { RunWaiter } from '../queue/runWaiter';
 import type { QueueRunRequest, QueueRunResult } from '../queue/types';
 import { RUN_STATUS } from '../workflow/types';
+import { executeWorkflowRun } from '../workflow/executeWorkflowRun';
 
 export function triggerRouter(params: {
   prisma: PrismaClient;
@@ -35,10 +36,8 @@ export function triggerRouter(params: {
       return res.status(err.status).json(err.body);
     }
 
-    if (!sqs || !requestQueueUrl) {
-      const err = serviceUnavailable('Queue is not configured');
-      return res.status(err.status).json(err.body);
-    }
+    const awsAccessKeyId = env[ENV_KEYS.awsAccessKeyId];
+    const allowSynchronous = !awsAccessKeyId;
 
     const input: unknown = req.body ?? {};
 
@@ -60,6 +59,23 @@ export function triggerRouter(params: {
       triggerPath,
       input,
     };
+
+    if (!sqs || !requestQueueUrl) {
+      if (!allowSynchronous) {
+        const err = serviceUnavailable('Queue is not configured');
+        return res.status(err.status).json(err.body);
+      }
+
+      // Synchronous mode: execute inline in the Node.js process.
+      const result = await executeWorkflowRun({ prisma, req: msg });
+      return res.json({
+        runId: run.id,
+        status: result.status,
+        error: result.error ?? null,
+        ctxFinal: result.ctxFinal ?? null,
+        workflowExecutionSteps: result.workflowExecutionSteps ?? null,
+      });
+    }
 
     await sqs.send(
       new SendMessageCommand({

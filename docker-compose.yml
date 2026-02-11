@@ -50,8 +50,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-please-change-me}
 
       AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+      # Leave these blank to run triggers synchronously (no queue).
+      # Set them (even to dummy values) to enable LocalStack SQS.
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY-}
       SQS_ENDPOINT: ${SQS_ENDPOINT_DOCKER:-http://localstack:4566}
 
       SQS_REQUEST_QUEUE_NAME: ${SQS_REQUEST_QUEUE_NAME:-workflow-requests}

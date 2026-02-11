@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { DEFAULTS, ENV_KEYS } from './constants';
 
+function emptyStringToUndefined(value: unknown): unknown {
+  return value === '' ? undefined : value;
+}
+
 const envSchema = z.object({
   [ENV_KEYS.port]: z.coerce.number().int().positive().default(DEFAULTS.port),
   [ENV_KEYS.nodeEnv]: z.enum(['development', 'test', 'production']).default('development'),
@@ -10,9 +14,9 @@ const envSchema = z.object({
   [ENV_KEYS.jwtSecret]: z.string().min(16),
 
   [ENV_KEYS.awsRegion]: z.string().min(1).default('us-east-1'),
-  [ENV_KEYS.awsAccessKeyId]: z.string().min(1).optional(),
-  [ENV_KEYS.awsSecretAccessKey]: z.string().min(1).optional(),
-  [ENV_KEYS.sqsEndpoint]: z.string().url().optional(),
+  [ENV_KEYS.awsAccessKeyId]: z.preprocess(emptyStringToUndefined, z.string().min(1).optional()),
+  [ENV_KEYS.awsSecretAccessKey]: z.preprocess(emptyStringToUndefined, z.string().min(1).optional()),
+  [ENV_KEYS.sqsEndpoint]: z.preprocess(emptyStringToUndefined, z.string().url().optional()),
 
   [ENV_KEYS.sqsRequestQueueName]: z.string().min(1).default(DEFAULTS.sqsRequestQueueName),
   [ENV_KEYS.sqsReplyQueueName]: z.string().min(1).default(DEFAULTS.sqsReplyQueueName),
