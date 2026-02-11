@@ -1,0 +1,47 @@
+databases:
+  - name: workflow-engine-db
+    plan: free
+
+services:
+  - type: web
+    name: workflow-engine
+    env: docker
+    plan: free
+    dockerContext: .
+    dockerfilePath: apps/server/Dockerfile
+
+    # Render sets $PORT automatically for web services.
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUBLIC_BASE_URL
+        value: https://workflow-engine.onrender.com
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: workflow-engine-db
+          property: connectionString
+
+      # Required
+      - key: JWT_SECRET
+        generateValue: true
+
+      # Optional: Slack
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+
+      # Queue/Worker
+      # Option A (recommended): use real AWS SQS (set these as secrets)
+      - key: WORKER_ENABLED
+        value: "true"
+      - key: AWS_REGION
+        value: us-east-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+
+      # If you *don't* want queues yet, set WORKER_ENABLED=false.
+      # Note: triggers won't run without a queue.
+      # - key: WORKER_ENABLED
+      #   value: "false"

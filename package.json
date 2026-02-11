@@ -1,0 +1,48 @@
+{
+  "name": "workflow-engine",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "scripts": {
+    "dev": "npm run build -w packages/shared && concurrently -n shared,server,web -c magenta,blue,green \"npm:dev -w packages/shared\" \"npm:dev -w apps/server\" \"npm:dev -w apps/web\"",
+    "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
+    "test": "npm run test -w packages/shared && npm run test -w apps/server && npm run test -w apps/web",
+    "lint": "npm run lint -w packages/shared && npm run lint -w apps/server && npm run lint -w apps/web",
+    "format": "prettier -w .",
+    "format:check": "prettier -c ."
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.5.2"
+  },
+  "overrides": {
+    "@aws-sdk/client-sqs": "3.540.0",
+    "@aws-sdk/client-sts": "3.540.0",
+    "@aws-sdk/client-sso": "3.540.0",
+    "@aws-sdk/client-sso-oidc": "3.540.0",
+
+    "@aws-sdk/credential-provider-node": "3.540.0",
+    "@aws-sdk/credential-provider-env": "3.540.0",
+    "@aws-sdk/credential-provider-http": "3.540.0",
+    "@aws-sdk/credential-provider-ini": "3.540.0",
+    "@aws-sdk/credential-provider-process": "3.540.0",
+    "@aws-sdk/credential-provider-sso": "3.540.0",
+    "@aws-sdk/credential-provider-web-identity": "3.540.0",
+
+    "@aws-sdk/middleware-user-agent": "3.540.0",
+    "@aws-sdk/nested-clients": "3.540.0",
+    "@aws-sdk/token-providers": "3.540.0",
+    "@aws-sdk/util-endpoints": "3.540.0",
+    "@aws-sdk/core": "3.535.0",
+    "@aws-sdk/region-config-resolver": "3.540.0",
+    "@aws-sdk/types": "3.540.0",
+    "@aws-sdk/util-locate-window": "3.540.0",
+    "@aws-sdk/util-user-agent-node": "3.540.0",
+    "@aws-sdk/xml-builder": "3.540.0"
+  }
+}

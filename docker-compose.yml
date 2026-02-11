@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-workflow_engine}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Persistent database storage (Docker named volume)
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-workflow_engine}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  localstack:
+    image: localstack/localstack:3.0
+    restart: unless-stopped
+    environment:
+      SERVICES: ${LOCALSTACK_SERVICES:-sqs}
+      DEBUG: ${LOCALSTACK_DEBUG:-0}
+    ports:
+      - "4566:4566"
+    volumes:
+      # Persistent LocalStack state (useful if you enable more services later)
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:4566/_localstack/health').read()"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    environment:
+      PORT: ${PORT:-3000}
+      NODE_ENV: ${NODE_ENV:-development}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql://postgres:postgres@postgres:5432/workflow_engine}
+
+      JWT_SECRET: ${JWT_SECRET:-change-me-please-change-me}
+
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+      SQS_ENDPOINT: ${SQS_ENDPOINT_DOCKER:-http://localstack:4566}
+
+      SQS_REQUEST_QUEUE_NAME: ${SQS_REQUEST_QUEUE_NAME:-workflow-requests}
+      SQS_REPLY_QUEUE_NAME: ${SQS_REPLY_QUEUE_NAME:-workflow-replies}
+
+      # Optional: for workflows using url: "env:SLACK_WEBHOOK_URL"
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+
+      WORKER_ENABLED: ${WORKER_ENABLED:-true}
+      WORKER_POLL_WAIT_SECONDS: ${WORKER_POLL_WAIT_SECONDS:-10}
+      WORKER_VISIBILITY_TIMEOUT_SECONDS: ${WORKER_VISIBILITY_TIMEOUT_SECONDS:-30}
+
+      TRIGGER_SYNC_TIMEOUT_MS: ${TRIGGER_SYNC_TIMEOUT_MS:-15000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  localstack_data:

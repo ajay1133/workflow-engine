@@ -1,0 +1,146 @@
+.container {
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.intro {
+  color: #555;
+}
+
+.layout {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 12px;
+}
+
+.panel {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.listPanel {
+  padding: 10px;
+}
+
+.listLabel {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.listButton {
+  width: 100%;
+  text-align: left;
+  padding: 10px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  margin-bottom: 6px;
+  background: transparent;
+}
+
+.listButtonSelected {
+  background: #f2f7ff;
+  border-color: #b8d3ff;
+}
+
+.listButtonId {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.listButtonKind {
+  font-size: 12px;
+  color: #666;
+}
+
+.selectedTitle {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+}
+
+.summary {
+  color: #444;
+  margin-bottom: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+.colHead {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+  margin-top: 0;
+}
+
+.codeBlock {
+  background: #f7f7f7;
+  padding: 10px;
+  border-radius: 8px;
+  overflow: auto;
+  margin: 0;
+  min-height: 180px;
+  box-sizing: border-box;
+}
+
+.codeTextarea {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  resize: vertical;
+}
+
+.parseError {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #b00020;
+}
+
+.notes {
+  margin-top: 12px;
+  color: #666;
+}
+
+.slackTestRow {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.slackTestInput {
+  min-width: 220px;
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 12px;
+}
