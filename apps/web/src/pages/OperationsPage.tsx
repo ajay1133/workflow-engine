@@ -12,13 +12,26 @@ function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function getByDotPath(obj: unknown, path: string): unknown {
   if (!path) return obj;
   const parts = path.split('.').filter(Boolean);
-  let cur: any = obj;
+  let cur: unknown = obj;
   for (const part of parts) {
     if (cur === null || cur === undefined) return undefined;
-    cur = cur?.[part];
+
+    if (Array.isArray(cur)) {
+      const idx = Number(part);
+      if (!Number.isInteger(idx)) return undefined;
+      cur = cur[idx];
+      continue;
+    }
+
+    if (!isRecord(cur)) return undefined;
+    cur = cur[part];
   }
   return cur;
 }
@@ -26,14 +39,17 @@ function getByDotPath(obj: unknown, path: string): unknown {
 function setByDotPath(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split('.').filter(Boolean);
   if (parts.length === 0) return;
-  let cur: any = obj;
+  let cur: Record<string, unknown> = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     const k = parts[i];
     const next = cur[k];
     if (typeof next !== 'object' || next === null || Array.isArray(next)) {
       cur[k] = {};
     }
-    cur = cur[k];
+
+    const ensured = cur[k];
+    cur = isRecord(ensured) ? ensured : {};
+    if (!isRecord(ensured)) cur[k] = cur;
   }
   cur[parts[parts.length - 1]] = value;
 }
@@ -143,13 +159,24 @@ function coerceInputToCtx(input: unknown): Record<string, unknown> {
     : ({ value: cloneJson(input) } as Record<string, unknown>);
 }
 
-function compileBlocks(ops: any[]): { ok: true; startToEnd: Map<number, number>; endToStart: Map<number, number> } | { ok: false; error: string } {
+function getAction(op: unknown): string | undefined {
+  if (!isRecord(op)) return undefined;
+  if (typeof op.action === 'string') return op.action;
+  if (typeof op.type === 'string') return op.type;
+  return undefined;
+}
+
+function compileBlocks(
+  ops: unknown[],
+):
+  | { ok: true; startToEnd: Map<number, number>; endToStart: Map<number, number> }
+  | { ok: false; error: string } {
   const startToEnd = new Map<number, number>();
   const endToStart = new Map<number, number>();
   const stack: Array<{ kind: 'if' | 'while'; index: number }> = [];
 
   for (let i = 0; i < ops.length; i++) {
-    const action = ops[i]?.action ?? ops[i]?.type;
+    const action = getAction(ops[i]);
     if (action === 'if.start') stack.push({ kind: 'if', index: i });
     if (action === 'while.start') stack.push({ kind: 'while', index: i });
 
@@ -173,7 +200,10 @@ function compileBlocks(ops: any[]): { ok: true; startToEnd: Map<number, number>;
   return { ok: true, startToEnd, endToStart };
 }
 
-function runDocWorkflow(params: { ops: any[]; input: unknown }): { output: unknown; workflowExecutionSteps: unknown[] } {
+function runDocWorkflow(params: {
+  ops: unknown[];
+  input: unknown;
+}): { output: unknown; workflowExecutionSteps: unknown[] } {
   const ctx = coerceInputToCtx(params.input);
   const compiled = compileBlocks(params.ops);
   if (!compiled.ok) {
@@ -190,13 +220,13 @@ function runDocWorkflow(params: { ops: any[]; input: unknown }): { output: unkno
   }
 
   const { startToEnd, endToStart } = compiled;
-  const steps: any[] = [];
+  const steps: unknown[] = [];
   const whileIterations = new Map<number, number>();
   const MAX_WHILE_ITERATIONS = 100;
 
   for (let i = 0; i < params.ops.length; ) {
-    const op = params.ops[i];
-    const action = op?.action ?? op?.type;
+    const op = isRecord(params.ops[i]) ? (params.ops[i] as Record<string, unknown>) : {};
+    const action = getAction(op);
 
     if (action === 'filter.compare') {
       const actual = getByDotPath(ctx, String(op?.key ?? ''));
@@ -240,11 +270,17 @@ function runDocWorkflow(params: { ops: any[]; input: unknown }): { output: unkno
     }
 
     if (action === 'send.http_request') {
+      const bodyMode =
+        isRecord(op.body) && typeof (op.body as Record<string, unknown>).mode === 'string'
+          ? String((op.body as Record<string, unknown>).mode)
+          : undefined;
+      const url = typeof op.url === 'string' && op.url.trim() ? op.url : 'env:SLACK_WEBHOOK_URL';
+      const method = typeof op.method === 'string' ? op.method : undefined;
       steps.push({
         action: 'send.http_request',
         details: {
           dryRun: true,
-          request: { method: op?.method, url: op?.url ?? 'env:SLACK_WEBHOOK_URL', bodyMode: op?.body?.mode },
+          request: { method, url, bodyMode },
           note: 'Docs runner does not execute network requests from the browser. Use a workflow trigger to test real HTTP calls.',
         },
         output: cloneJson(ctx),
@@ -397,10 +433,13 @@ export function OperationsPage(): ReactNode {
   useEffect(() => {
     if (selected.id !== 'send.http_request') return;
     try {
-      const parsed = JSON.parse(tryUsageText) as any;
-      const op = Array.isArray(parsed) ? parsed.find((x) => x?.action === 'send.http_request') : parsed;
+      const parsed: unknown = JSON.parse(tryUsageText);
+      const opCandidate = Array.isArray(parsed)
+        ? parsed.find((x) => getAction(x) === 'send.http_request' || getAction(x) === 'fetch.http_request')
+        : parsed;
+      const op = isRecord(opCandidate) ? opCandidate : null;
       const url = typeof op?.url === 'string' ? op.url : '';
-      if (typeof url === 'string') setSlackTestUrl(url);
+      if (url) setSlackTestUrl(url);
     } catch {
       // ignore
     }

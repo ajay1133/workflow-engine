@@ -12,6 +12,14 @@ import {
 import type { Workflow, WorkflowRunListItem } from '../types';
 import { StepsEditor } from '../components/StepsEditor';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function coerceRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
 function deriveNameFromId(id: unknown): string {
   if (typeof id !== 'string') return '';
   const base = id.replace(/_+/g, ' ').trim().replace(/\s+/g, ' ');
@@ -55,7 +63,9 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [runs, setRuns] = useState<WorkflowRunListItem[] | null>(null);
   const [workflowJson, setWorkflowJson] = useState(DEFAULT_WORKFLOW_JSON);
-  const [lastGoodWorkflow, setLastGoodWorkflow] = useState<any>(() => JSON.parse(DEFAULT_WORKFLOW_JSON));
+  const [lastGoodWorkflow, setLastGoodWorkflow] = useState<Record<string, unknown>>(() =>
+    coerceRecord(JSON.parse(DEFAULT_WORKFLOW_JSON) as unknown),
+  );
   const [inputJson, setInputJson] = useState(JSON.stringify({ key: 'test', value: 'test' }, null, 2));
 
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +77,7 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
   const [autoNameSource, setAutoNameSource] = useState<'derived' | 'server-default'>(() => 'derived');
 
   function setWorkflowFields(patch: Record<string, unknown>) {
-    const base = parsedWorkflow.ok ? parsedWorkflow.value : lastGoodWorkflow;
+    const base = parsedWorkflow.ok && isRecord(parsedWorkflow.value) ? parsedWorkflow.value : lastGoodWorkflow;
     const next = { ...base, ...patch };
     setLastGoodWorkflow(next);
     setWorkflowJson(JSON.stringify(next, null, 2));
@@ -103,7 +113,7 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
 
   const parsedWorkflow = useMemo(() => {
     try {
-      return { ok: true as const, value: JSON.parse(workflowJson) as any };
+      return { ok: true as const, value: JSON.parse(workflowJson) as unknown };
     } catch (e) {
       return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
     }
@@ -114,8 +124,10 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
     if (props.mode !== 'create') return;
     if (!parsedWorkflow.ok) return;
 
-    const currentId = parsedWorkflow.value?.id;
-    const currentName = parsedWorkflow.value?.name;
+    if (!isRecord(parsedWorkflow.value)) return;
+
+    const currentId = parsedWorkflow.value.id;
+    const currentName = parsedWorkflow.value.name;
 
     // Only auto-apply defaults if user hasn't changed away from the initial template.
     if (currentId !== 'test' || currentName !== 'Test') return;
@@ -134,7 +146,7 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
 
   useEffect(() => {
     if (parsedWorkflow.ok) {
-      setLastGoodWorkflow(parsedWorkflow.value);
+      setLastGoodWorkflow(coerceRecord(parsedWorkflow.value));
     }
   }, [parsedWorkflow.ok, parsedWorkflow.ok ? parsedWorkflow.value : null]);
 
@@ -144,11 +156,13 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
     if (nameManuallyEdited) return;
     if (autoNameSource !== 'derived') return;
 
-    const currentId = parsedWorkflow.value?.id;
+    if (!isRecord(parsedWorkflow.value)) return;
+
+    const currentId = parsedWorkflow.value.id;
     const derived = deriveNameFromId(currentId);
     if (!derived) return;
 
-    const currentName = typeof parsedWorkflow.value?.name === 'string' ? parsedWorkflow.value.name : '';
+    const currentName = typeof parsedWorkflow.value.name === 'string' ? parsedWorkflow.value.name : '';
 
     if (currentName && currentName !== derived && currentName !== lastAutoName) {
       setNameManuallyEdited(true);
@@ -169,36 +183,36 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
     autoNameSource,
   ]);
 
-  const name = parsedWorkflow.ok && typeof parsedWorkflow.value?.name === 'string' ? parsedWorkflow.value.name : '';
-  const enabled = parsedWorkflow.ok && typeof parsedWorkflow.value?.enabled === 'boolean' ? parsedWorkflow.value.enabled : true;
-  const stepsValue = parsedWorkflow.ok ? parsedWorkflow.value?.steps : undefined;
+  const parsedValue = parsedWorkflow.ok && isRecord(parsedWorkflow.value) ? parsedWorkflow.value : null;
+  const name = parsedValue && typeof parsedValue.name === 'string' ? parsedValue.name : '';
+  const enabled = parsedValue && typeof parsedValue.enabled === 'boolean' ? parsedValue.enabled : true;
+  const stepsValue = parsedValue ? parsedValue.steps : undefined;
 
   const sendUrl = useMemo(() => {
-    const wf = (parsedWorkflow.ok ? parsedWorkflow.value : lastGoodWorkflow) as any;
-    const steps = Array.isArray(wf?.steps) ? wf.steps : [];
+    const wf = parsedWorkflow.ok && isRecord(parsedWorkflow.value) ? parsedWorkflow.value : lastGoodWorkflow;
+    const stepsRaw = wf.steps;
+    const steps = Array.isArray(stepsRaw) ? stepsRaw : [];
     const op = steps.find(
-      (s: any) =>
-        s &&
-        typeof s === 'object' &&
+      (s): s is Record<string, unknown> =>
+        isRecord(s) &&
         (s.action === 'send.http_request' || s.type === 'send.http_request' || s.type === 'fetch.http_request'),
     );
     return typeof op?.url === 'string' ? op.url : '';
   }, [parsedWorkflow.ok, parsedWorkflow.ok ? parsedWorkflow.value : null, lastGoodWorkflow]);
 
   function setWorkflowField(field: 'name' | 'enabled', value: unknown) {
-    const base = parsedWorkflow.ok ? parsedWorkflow.value : lastGoodWorkflow;
+    const base = parsedWorkflow.ok && isRecord(parsedWorkflow.value) ? parsedWorkflow.value : lastGoodWorkflow;
     const next = { ...base, [field]: value };
     setLastGoodWorkflow(next);
     setWorkflowJson(JSON.stringify(next, null, 2));
   }
 
   function setSendHttpUrl(url: string) {
-    const base = (parsedWorkflow.ok ? parsedWorkflow.value : lastGoodWorkflow) as any;
-    const steps: any[] = Array.isArray(base?.steps) ? [...base.steps] : [];
+    const base = parsedWorkflow.ok && isRecord(parsedWorkflow.value) ? parsedWorkflow.value : lastGoodWorkflow;
+    const steps: unknown[] = Array.isArray(base.steps) ? [...base.steps] : [];
     const idx = steps.findIndex(
       (s) =>
-        s &&
-        typeof s === 'object' &&
+        isRecord(s) &&
         (s.action === 'send.http_request' || s.type === 'send.http_request' || s.type === 'fetch.http_request'),
     );
 
@@ -206,12 +220,23 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
       steps.push({ action: 'send.http_request', method: 'POST', url });
     } else {
       const existing = steps[idx];
-      steps[idx] = {
-        ...existing,
-        action: existing.action ?? (existing.type === 'fetch.http_request' ? 'send.http_request' : existing.type) ?? 'send.http_request',
-        method: existing.method ?? 'POST',
-        url,
-      };
+      if (isRecord(existing)) {
+        steps[idx] = {
+          ...existing,
+          action:
+            typeof existing.action === 'string'
+              ? existing.action
+              : existing.type === 'fetch.http_request'
+                ? 'send.http_request'
+                : typeof existing.type === 'string'
+                  ? existing.type
+                  : 'send.http_request',
+          method: typeof existing.method === 'string' ? existing.method : 'POST',
+          url,
+        };
+      } else {
+        steps[idx] = { action: 'send.http_request', method: 'POST', url };
+      }
     }
 
     const next = { ...base, steps };
@@ -237,7 +262,10 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
       }
 
       if (props.mode === 'create') {
-        const id = typeof (parsedWorkflow.value as any)?.id === 'string' ? String((parsedWorkflow.value as any).id) : undefined;
+        const id =
+          isRecord(parsedWorkflow.value) && typeof parsedWorkflow.value.id === 'string'
+            ? parsedWorkflow.value.id
+            : undefined;
         const created = await createWorkflow({ id, name, enabled, steps: stepsValue });
         navigate(`/workflows/${encodeURIComponent(created.id)}`);
         return;
