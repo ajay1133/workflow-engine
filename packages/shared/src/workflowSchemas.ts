@@ -15,15 +15,6 @@ const slackWebhookUrlSchema = z
     }
   }, 'Invalid Slack webhook url');
 
-const slackWebhookOrEnvSchema = z
-  .string()
-  .min(1)
-  .refine((raw) => {
-    const value = raw.trim();
-    if (value.startsWith('env:')) return value.slice('env:'.length).trim().length > 0;
-    return slackWebhookUrlSchema.safeParse(value).success;
-  }, 'Invalid Slack webhook url');
-
 export const dotPathSchema = z
   .string()
   .min(1)
@@ -142,7 +133,7 @@ export const sendHttpRequestOpSchema = z.object({
   action: z.literal(ACTION_TYPE.send_http_request).optional(),
   type: z.enum([ACTION_TYPE.send_http_request, 'fetch.http_request']).optional(),
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
-  url: slackWebhookOrEnvSchema.optional().default('env:SLACK_WEBHOOK_URL'),
+  url: slackWebhookUrlSchema,
   headers: z.record(z.string()).optional(),
   body: httpRequestBodySchema.optional(),
   timeoutMs: z.number().int().positive().max(30_000).default(2000),

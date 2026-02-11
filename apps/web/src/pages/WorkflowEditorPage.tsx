@@ -27,6 +27,17 @@ function deriveNameFromId(id: unknown): string {
   return base.charAt(0).toUpperCase() + base.slice(1);
 }
 
+function isSlackWebhookUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw.trim());
+    if (u.protocol !== 'https:') return false;
+    if (u.hostname !== 'hooks.slack.com') return false;
+    return /^\/services\/[^/]+\/[^/]+\/[^/]+$/.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
 const DEFAULT_WORKFLOW_JSON = JSON.stringify(
   {
     id: 'test',
@@ -43,7 +54,7 @@ const DEFAULT_WORKFLOW_JSON = JSON.stringify(
       {
         action: 'send.http_request',
         method: 'POST',
-        url: 'env:SLACK_WEBHOOK_URL',
+        url: '',
         headers: { 'content-type': 'application/json' },
         body: { mode: 'custom', value: { text: '{{title}}' } },
         timeoutMs: 2000,
@@ -261,6 +272,22 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
         throw new Error('Workflow steps must be an array');
       }
 
+      // send.http_request requires an explicit Slack webhook URL.
+      const sendOp = stepsValue.find(
+        (s): s is Record<string, unknown> =>
+          isRecord(s) &&
+          (s.action === 'send.http_request' || s.type === 'send.http_request' || s.type === 'fetch.http_request'),
+      );
+      if (sendOp) {
+        const url = typeof sendOp.url === 'string' ? sendOp.url.trim() : '';
+        if (!url) {
+          throw new Error('Send URL (send.http_request) is required');
+        }
+        if (!isSlackWebhookUrl(url)) {
+          throw new Error('Send URL must be a valid Slack webhook URL (https://hooks.slack.com/services/...)');
+        }
+      }
+
       if (props.mode === 'create') {
         const id =
           isRecord(parsedWorkflow.value) && typeof parsedWorkflow.value.id === 'string'
@@ -361,7 +388,7 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
               value={sendUrl}
               onChange={(e) => setSendHttpUrl(e.target.value)}
               disabled={busy}
-              placeholder="https://hooks.slack.com/services/..."
+              placeholder="SLACK_WEBHOOK_URL"
             />
           </label>
 
@@ -409,8 +436,8 @@ export function WorkflowEditorPage(props: { mode: 'create' | 'edit' }): ReactNod
                 </button>
               </div>
             </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ color: '#666', fontSize: 12, marginBottom: 6 }}>Result</div>
+            <div style={{ minWidth: 0, marginLeft: 25, marginTop: -7 }}>
+              <div style={{ color: '#666', fontSize: 12, marginBottom: 6 }}>Workflow Response</div>
               <pre style={{ background: '#f7f7f7', padding: 12, minHeight: 200, overflow: 'auto', maxWidth: '100%' }}>
                 {triggerResult ?? '—'}
               </pre>

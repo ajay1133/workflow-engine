@@ -15,18 +15,6 @@ function isSlackWebhookUrl(raw: string): boolean {
   }
 }
 
-function resolveEnvUrl(url: string): { ok: true; url: string } | { ok: false; error: string } {
-  const trimmed = url.trim();
-  if (!trimmed.startsWith('env:')) return { ok: true, url };
-
-  const key = trimmed.slice('env:'.length).trim();
-  if (!key) return { ok: false, error: 'send.http_request url uses env: but no key was provided' };
-
-  const value = process.env[key];
-  if (!value) return { ok: false, error: `Missing required environment variable ${key} for send.http_request url` };
-  return { ok: true, url: value };
-}
-
 export type Ctx = Record<string, unknown>;
 
 export type EngineResult =
@@ -117,21 +105,25 @@ export async function runWorkflowSteps(params: {
     if (op.action === ACTION_TYPE.send_http_request) {
       const headers = op.headers ? (deepTemplate(op.headers, ctx) as Record<string, string>) : undefined;
 
-      const urlRaw = op.url && op.url.trim().length > 0 ? op.url : 'env:SLACK_WEBHOOK_URL';
-
-      const resolvedUrl = resolveEnvUrl(urlRaw);
-      if (!resolvedUrl.ok) {
+      const url = op.url?.trim();
+      if (!url) {
+        const message = 'send.http_request requires a non-empty url';
         workflowExecutionSteps.push({
           action: ACTION_TYPE.send_http_request,
-          details: { error: resolvedUrl.error },
+          details: { error: message },
           output: cloneCtx(ctx),
         });
-        return {
-          status: 'failed',
-          ctx,
-          trace: { workflowExecutionSteps },
-          error: { message: resolvedUrl.error },
-        };
+        return { status: 'failed', ctx, trace: { workflowExecutionSteps }, error: { message } };
+      }
+
+      if (url.startsWith('env:')) {
+        const message = 'send.http_request url cannot use env:; pass the webhook url directly';
+        workflowExecutionSteps.push({
+          action: ACTION_TYPE.send_http_request,
+          details: { error: message },
+          output: cloneCtx(ctx),
+        });
+        return { status: 'failed', ctx, trace: { workflowExecutionSteps }, error: { message } };
       }
 
       let body: unknown = undefined;
@@ -144,10 +136,10 @@ export async function runWorkflowSteps(params: {
       const result = await executeHttpRequest({
         step: {
           method: op.method,
-          url: resolvedUrl.url,
+          url,
           headers,
           body: op.body,
-          timeoutMs: op.timeoutMs ?? (isSlackWebhookUrl(resolvedUrl.url) ? 10_000 : 2_000),
+          timeoutMs: op.timeoutMs ?? (isSlackWebhookUrl(url) ? 10_000 : 2_000),
           retries: op.retries ?? 0,
         },
         jsonBody: body,
@@ -164,7 +156,7 @@ export async function runWorkflowSteps(params: {
       workflowExecutionSteps.push({
         action: ACTION_TYPE.send_http_request,
         details: {
-          request: { method: op.method, url: resolvedUrl.url, headers, bodyMode: op.body?.mode },
+          request: { method: op.method, url, headers, bodyMode: op.body?.mode },
           response: {
             ok: result.ok,
             status: result.status,

@@ -25,13 +25,15 @@ COPY apps/web apps/web
 # Avoid CRLF issues on Windows checkouts
 RUN sed -i 's/\r$//' apps/server/docker-entrypoint.sh
 
-# Build shared + server
+# Generate Prisma client (needs schema). Prisma requires DATABASE_URL to be set
+# even though generate itself does not connect to the database.
+RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/workflow?schema=public" \
+	npm --prefix apps/server run prisma:generate
+
+# Build shared + server + web
 RUN npm run build -w packages/shared
 RUN npm run build -w apps/server
 RUN npm run build -w apps/web
-
-# Generate Prisma client (needs schema)
-RUN npm --prefix apps/server run prisma:generate
 
 
 FROM node:18-bullseye-slim

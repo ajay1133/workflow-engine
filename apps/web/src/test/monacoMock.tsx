@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import styles from './monacoMock.module.css';
 
 export type EditorProps = {
   value?: string;
@@ -13,7 +14,7 @@ export default function Editor(props: EditorProps): ReactNode {
   return (
     <textarea
       aria-label="steps-editor"
-      style={{ width: '100%', minHeight: 200 }}
+      className={styles.textarea}
       value={props.value ?? props.defaultValue ?? ''}
       onChange={(e) => props.onChange?.(e.target.value)}
     />

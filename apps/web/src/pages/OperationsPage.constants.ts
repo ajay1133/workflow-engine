@@ -100,11 +100,11 @@ export const DOCS: OperationDoc[] = [
     title: 'send.http_request',
     kind: 'operation',
     summary:
-      'Posts to a Slack incoming webhook. url must be https://hooks.slack.com/services/... or env:SLACK_WEBHOOK_URL (default if omitted). Supports templated headers/body, timeoutMs, and retries. Retries happen on network errors/timeouts (no response) and HTTP 4xx/5xx. Response metadata is added to Input.send_http_response / Input.send_http_status / Input.send_http_ok / Input.send_http_retries_used, and the run trace includes retriesUsed.',
+      'Posts to a Slack incoming webhook. url must be https://hooks.slack.com/services/.... Supports templated headers/body, timeoutMs, and retries. Retries happen on network errors/timeouts (no response) and HTTP 4xx/5xx. Response metadata is added to Input.send_http_response / Input.send_http_status / Input.send_http_ok / Input.send_http_retries_used, and the run trace includes retriesUsed.',
     usage: {
       action: 'send.http_request',
       method: 'POST',
-      url: 'env:SLACK_WEBHOOK_URL',
+      url: '',
       headers: { 'content-type': 'application/json' },
       body: { mode: 'custom', value: { text: '{{value}}' } },
       timeoutMs: 2000,
@@ -115,7 +115,7 @@ export const DOCS: OperationDoc[] = [
       {
         action: 'send.http_request',
         details: {
-          request: { method: 'POST', url: 'env:SLACK_WEBHOOK_URL', headers: { 'content-type': 'application/json' }, bodyMode: 'custom' },
+          request: { method: 'POST', url: '', headers: { 'content-type': 'application/json' }, bodyMode: 'custom' },
           response: { ok: true, status: 200, bodyText: 'ok' },
         },
         output: { value: 'test', send_http_ok: true, send_http_status: 200, send_http_response: 'ok' },

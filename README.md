@@ -183,7 +183,7 @@ Usage:
 {
 	"action": "send.http_request",
 	"method": "POST",
-	"url": "env:SLACK_WEBHOOK_URL",
+	"url": "https://hooks.slack.com/services/...",
 	"headers": { "content-type": "application/json" },
 	"body": { "mode": "custom", "value": { "text": "{{value}}" } },
 	"timeoutMs": 5000,
@@ -217,6 +217,8 @@ Usage (paired block):
 	{ "action": "if.end" }
 ]
 ```
+
+Security note: Slack incoming webhook URLs are secrets. Don’t commit them to git or paste them into logs.
 
 ### while.start / while.end
 Loop block. Steps between `while.start` and `while.end` run repeatedly while the condition passes.
@@ -255,7 +257,7 @@ Usage:
 	{
 		"action": "send.http_request",
 		"method": "POST",
-		"url": "env:SLACK_WEBHOOK_URL",
+		"url": "https://hooks.slack.com/services/...",
 		"headers": { "content-type": "application/json" },
 		"body": { "mode": "custom", "value": { "text": "{{msg}}" } },
 		"timeoutMs": 5000,
@@ -279,7 +281,7 @@ You can send notifications via the `send.http_request` operation.
 	{
 		"action": "send.http_request",
 		"method": "POST",
-		"url": "env:SLACK_WEBHOOK_URL",
+		"url": "https://hooks.slack.com/services/...",
 		"headers": { "content-type": "application/json" },
 		"body": { "mode": "custom", "value": { "content": "{{msg}}" } },
 		"timeoutMs": 5000,
@@ -288,7 +290,7 @@ You can send notifications via the `send.http_request` operation.
 ]
 ```
 
-Note: set `SLACK_WEBHOOK_URL` in `apps/server/.env` to a real Slack incoming webhook URL.
+Note: `send.http_request.url` must contain the Slack incoming webhook URL directly.
 
 Sample input:
 
@@ -320,7 +322,7 @@ This repo can be deployed to Render as a single Docker-based Web Service that se
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
    - `AWS_REGION` (defaults to `us-east-1` in `render.yaml`)
-   - `SLACK_WEBHOOK_URL` (optional)
+
 4. Update `PUBLIC_BASE_URL` to match your Render URL (or custom domain).
 
 On deploy, the container entrypoint runs `prisma migrate deploy` and then starts the server.
@@ -331,5 +333,5 @@ If you set `WORKER_ENABLED=false`, the app will start and you can use the UI, bu
 
 ### Security note
 
-If you ever paste a Slack webhook URL into a chat or commit it to git, **rotate it immediately** in Slack (create a new Incoming Webhook URL) and update `SLACK_WEBHOOK_URL` in Render.
+If you ever paste a Slack webhook URL into a chat or commit it to git, **rotate it immediately** in Slack (create a new Incoming Webhook URL) and update any workflows that reference it.
 		"timeoutMs": 5000,

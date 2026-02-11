@@ -33,7 +33,7 @@ export function createApp(params: {
   app.use(ROUTES.auth, authRouter({ prisma: params.prisma, env: params.env }));
 
   app.use(ROUTES.workflows, requireAuth(params.env), workflowsRouter({ prisma: params.prisma, env: params.env }));
-  app.use(`${API_PREFIX}/slack`, requireAuth(params.env), slackRouter({ env: params.env }));
+  app.use(`${API_PREFIX}/slack`, requireAuth(params.env), slackRouter());
   app.use(API_PREFIX, requireAuth(params.env), runsRouter({ prisma: params.prisma }));
   app.use(
     triggerRouter({

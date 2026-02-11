@@ -1,0 +1,57 @@
+.container {
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  max-width: 520px;
+  margin: 60px auto;
+}
+
+.title {
+  margin-top: 0;
+}
+
+.intro {
+  color: #555;
+}
+
+.errorBox {
+  background: #ffecec;
+  border: 1px solid #f5b5b5;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.labelTight {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.fieldTitle {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.button {
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  background: #111;
+  color: white;
+}
+
+.note {
+  margin-top: 14px;
+  color: #555;
+  font-size: 13px;
+}

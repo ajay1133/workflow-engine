@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { signup } from '../api';
 import { setAuthToken } from '../auth';
+import styles from './SignupPage.module.css';
 
 export function SignupPage(): ReactNode {
   const nav = useNavigate();
@@ -38,31 +39,29 @@ export function SignupPage(): ReactNode {
   }
 
   return (
-    <div style={{ padding: 16, fontFamily: 'system-ui, sans-serif', maxWidth: 520, margin: '60px auto' }}>
-      <h1 style={{ marginTop: 0 }}>Workflow Engine</h1>
-      <p style={{ color: '#555' }}>Create an account to use the dashboard.</p>
+    <div className={styles.container}>
+      <h1 className={styles.title}>Workflow Engine</h1>
+      <p className={styles.intro}>Create an account to use the dashboard.</p>
 
       {error ? (
-        <div style={{ background: '#ffecec', border: '1px solid #f5b5b5', padding: 12, marginBottom: 12 }}>
-          {error}
-        </div>
+        <div className={styles.errorBox}>{error}</div>
       ) : null}
 
       <form onSubmit={onSubmit}>
-        <label style={{ display: 'block', marginBottom: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Email</div>
+        <label className={styles.label}>
+          <div className={styles.fieldTitle}>Email</div>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             type="email"
             required
             autoComplete="email"
-            style={{ width: '100%', padding: 10, border: '1px solid #ccc', borderRadius: 6 }}
+            className={styles.input}
           />
         </label>
 
-        <label style={{ display: 'block', marginBottom: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Password</div>
+        <label className={styles.label}>
+          <div className={styles.fieldTitle}>Password</div>
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -70,12 +69,12 @@ export function SignupPage(): ReactNode {
             required
             minLength={8}
             autoComplete="new-password"
-            style={{ width: '100%', padding: 10, border: '1px solid #ccc', borderRadius: 6 }}
+            className={styles.input}
           />
         </label>
 
-        <label style={{ display: 'block', marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Confirm password</div>
+        <label className={styles.labelTight}>
+          <div className={styles.fieldTitle}>Confirm password</div>
           <input
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -83,20 +82,20 @@ export function SignupPage(): ReactNode {
             required
             minLength={8}
             autoComplete="new-password"
-            style={{ width: '100%', padding: 10, border: '1px solid #ccc', borderRadius: 6 }}
+            className={styles.input}
           />
         </label>
 
         <button
           type="submit"
           disabled={busy}
-          style={{ padding: '10px 14px', borderRadius: 6, border: '1px solid #333', background: '#111', color: 'white' }}
+          className={styles.button}
         >
           {busy ? 'Creating…' : 'Sign up'}
         </button>
       </form>
 
-      <p style={{ marginTop: 14, color: '#555', fontSize: 13 }}>
+      <p className={styles.note}>
         Already have an account? <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`}>Login</Link>
       </p>
     </div>

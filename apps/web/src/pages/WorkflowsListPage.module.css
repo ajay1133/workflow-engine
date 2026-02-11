@@ -1,0 +1,58 @@
+.container {
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.intro {
+  color: #555;
+}
+
+.errorBox {
+  background: #ffecec;
+  border: 1px solid #f5b5b5;
+  padding: 12px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.th {
+  border-bottom: 1px solid #ddd;
+  padding: 10px 8px;
+  font-weight: 600;
+  color: #333;
+}
+
+.td {
+  border-bottom: 1px solid #eee;
+  padding: 10px 8px;
+  vertical-align: top;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.loadMore {
+  margin-top: 12px;
+}

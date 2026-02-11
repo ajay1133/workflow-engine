@@ -26,10 +26,6 @@ services:
       - key: JWT_SECRET
         generateValue: true
 
-      # Optional: Slack
-      - key: SLACK_WEBHOOK_URL
-        sync: false
-
       # Queue/Worker
       # Option A (recommended): use real AWS SQS (set these as secrets)
       - key: WORKER_ENABLED

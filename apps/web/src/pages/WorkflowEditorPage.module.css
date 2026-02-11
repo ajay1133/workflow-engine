@@ -1,0 +1,141 @@
+.container {
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+}
+
+.errorBox {
+  background: #ffecec;
+  border: 1px solid #f5b5b5;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.twoCol {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 10px;
+  color: #333;
+  font-size: 13px;
+}
+
+.input {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  margin-top: 6px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.triggerUrlInput {
+  flex: 1;
+  background: #f7f7f7;
+}
+
+.enabledRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.jsonError {
+  margin-top: 8px;
+  color: #b00020;
+}
+
+.sectionNote {
+  color: #777;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.subHeader {
+  margin: 0 0 8px 0;
+}
+
+.triggerTestGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mutedLabel {
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.textarea {
+  min-height: 200px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.mt8 {
+  margin-top: 8px;
+}
+
+.resultCol {
+  min-width: 0;
+  margin-left: 25px;
+  margin-top: -7px;
+}
+
+.pre {
+  background: #f7f7f7;
+  padding: 12px;
+  min-height: 200px;
+  overflow: auto;
+  max-width: 100%;
+}
+
+.runsHeader {
+  margin: 16px 0 8px 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.th {
+  border-bottom: 1px solid #ddd;
+  padding: 10px 8px;
+  font-weight: 600;
+  color: #333;
+}
+
+.td {
+  border-bottom: 1px solid #eee;
+  padding: 10px 8px;
+  vertical-align: top;
+}

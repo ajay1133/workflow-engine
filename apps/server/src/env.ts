@@ -37,29 +37,6 @@ const envSchema = z.object({
     .min(500)
     .max(60_000)
     .default(DEFAULTS.triggerSyncTimeoutMs),
-
-  [ENV_KEYS.slackWebhookUrl]: z.preprocess(
-    (raw) => (typeof raw === 'string' && raw.trim() === '' ? undefined : raw),
-    z
-      .string()
-      .url()
-      .refine(
-        (raw) => {
-          try {
-            const u = new URL(raw);
-            return (
-              u.protocol === 'https:' &&
-              u.hostname === 'hooks.slack.com' &&
-              /^\/services\/[^/]+\/[^/]+\/[^/]+$/.test(u.pathname)
-            );
-          } catch {
-            return false;
-          }
-        },
-        { message: 'Must be a valid Slack incoming webhook URL (https://hooks.slack.com/services/...)' },
-      )
-      .optional(),
-  ),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

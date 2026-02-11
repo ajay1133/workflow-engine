@@ -34,23 +34,6 @@ test('accepts if/while and create_or_update operations', () => {
   expect(result.success).toBe(true);
 });
 
-test('accepts send.http_request url env:KEY', () => {
-  const steps = [
-    {
-      action: 'send.http_request',
-      method: 'POST',
-      url: 'env:SLACK_WEBHOOK_URL',
-      headers: { 'content-type': 'application/json' },
-      body: { mode: 'custom', value: { text: '{{value}}' } },
-      timeoutMs: 2000,
-      retries: 0,
-    },
-  ];
-
-  const result = workflowStepsSchema.safeParse(steps);
-  expect(result.success).toBe(true);
-});
-
 test('accepts a valid Slack webhook URL shape', () => {
   const steps = [
     {

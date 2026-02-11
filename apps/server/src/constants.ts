@@ -31,8 +31,6 @@ export const ENV_KEYS = {
   workerVisibilityTimeoutSeconds: 'WORKER_VISIBILITY_TIMEOUT_SECONDS',
 
   triggerSyncTimeoutMs: 'TRIGGER_SYNC_TIMEOUT_MS',
-
-  slackWebhookUrl: 'SLACK_WEBHOOK_URL',
 } as const;
 
 export const DEFAULTS = {

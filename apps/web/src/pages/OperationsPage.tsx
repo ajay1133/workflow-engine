@@ -274,7 +274,7 @@ function runDocWorkflow(params: {
         isRecord(op.body) && typeof (op.body as Record<string, unknown>).mode === 'string'
           ? String((op.body as Record<string, unknown>).mode)
           : undefined;
-      const url = typeof op.url === 'string' && op.url.trim() ? op.url : 'env:SLACK_WEBHOOK_URL';
+      const url = typeof op.url === 'string' ? op.url : '';
       const method = typeof op.method === 'string' ? op.method : undefined;
       steps.push({
         action: 'send.http_request',
@@ -492,8 +492,8 @@ export function OperationsPage(): ReactNode {
       return;
     }
 
-    if (!(url.startsWith('env:') || isSlackWebhookUrl(url))) {
-      setSlackTestError('Invalid Slack webhook URL (expected https://hooks.slack.com/services/... or env:SLACK_WEBHOOK_URL)');
+    if (!isSlackWebhookUrl(url)) {
+      setSlackTestError('Invalid Slack webhook URL (expected https://hooks.slack.com/services/...)');
       return;
     }
 
@@ -608,7 +608,7 @@ export function OperationsPage(): ReactNode {
                   className={styles.slackTestInput}
                   value={slackTestUrl}
                   onChange={(e) => setSlackTestUrl(e.target.value)}
-                  placeholder="https://hooks.slack.com/services/... or env:SLACK_WEBHOOK_URL"
+                  placeholder="SLACK_WEBHOOK_URL"
                   disabled={slackTestBusy}
                 />
                 <input
