@@ -100,31 +100,7 @@ function evaluateFilterOp(params: { actual: unknown; op: string; expected: unkno
   const { actual, expected, op } = params;
 
   if (op === 'eq') return isEqual(actual, expected);
-  if (op === 'neq' || op === 'noteq') return !isEqual(actual, expected);
-
-  if (op === 'contains') {
-    if (typeof actual === 'string' && typeof expected === 'string') return actual.includes(expected);
-    if (Array.isArray(actual)) return actual.some((v) => isEqual(v, expected));
-    return false;
-  }
-
-  if (op === 'begins') {
-    if (typeof actual === 'string' && typeof expected === 'string') return actual.startsWith(expected);
-    return false;
-  }
-
-  if (op === 'ends') {
-    if (typeof actual === 'string' && typeof expected === 'string') return actual.endsWith(expected);
-    return false;
-  }
-
-  const cmp = compareScalars(actual, expected);
-  if (cmp === null) return false;
-
-  if (op === 'gt') return cmp > 0;
-  if (op === 'gte') return cmp >= 0;
-  if (op === 'lt') return cmp < 0;
-  if (op === 'lte') return cmp <= 0;
+  if (op === 'neq') return !isEqual(actual, expected);
 
   return false;
 }
@@ -159,125 +135,106 @@ function coerceInputToCtx(input: unknown): Record<string, unknown> {
     : ({ value: cloneJson(input) } as Record<string, unknown>);
 }
 
-function getAction(op: unknown): string | undefined {
-  if (!isRecord(op)) return undefined;
-  if (typeof op.action === 'string') return op.action;
-  if (typeof op.type === 'string') return op.type;
-  return undefined;
-}
-
-function compileBlocks(
-  ops: unknown[],
-):
-  | { ok: true; startToEnd: Map<number, number>; endToStart: Map<number, number> }
-  | { ok: false; error: string } {
-  const startToEnd = new Map<number, number>();
-  const endToStart = new Map<number, number>();
-  const stack: Array<{ kind: 'if' | 'while'; index: number }> = [];
-
-  for (let i = 0; i < ops.length; i++) {
-    const action = getAction(ops[i]);
-    if (action === 'if.start') stack.push({ kind: 'if', index: i });
-    if (action === 'while.start') stack.push({ kind: 'while', index: i });
-
-    if (action === 'if.end' || action === 'while.end') {
-      const expectedKind = action === 'if.end' ? 'if' : 'while';
-      const top = stack.pop();
-      if (!top) return { ok: false, error: `${action} has no matching ${expectedKind}.start` };
-      if (top.kind !== expectedKind) {
-        return { ok: false, error: `${action} closes a ${top.kind}.start; blocks must be properly nested` };
-      }
-      startToEnd.set(top.index, i);
-      endToStart.set(i, top.index);
+function deepTemplate(value: unknown, ctx: Record<string, unknown>): unknown {
+  if (typeof value === 'string') return renderTemplate(value, ctx);
+  if (Array.isArray(value)) return value.map((v) => deepTemplate(v, ctx));
+  if (isRecord(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = deepTemplate(v, ctx);
     }
+    return out;
   }
-
-  if (stack.length > 0) {
-    const top = stack[stack.length - 1];
-    return { ok: false, error: `${top.kind}.start has no matching ${top.kind}.end` };
-  }
-
-  return { ok: true, startToEnd, endToStart };
+  return value;
 }
 
 function runDocWorkflow(params: {
-  ops: unknown[];
-  input: unknown;
+  steps: unknown[];
+  ctxInput: unknown;
 }): { output: unknown; workflowExecutionSteps: unknown[] } {
-  const ctx = coerceInputToCtx(params.input);
-  const compiled = compileBlocks(params.ops);
-  if (!compiled.ok) {
-    return {
-      output: cloneJson(ctx),
-      workflowExecutionSteps: [
-        {
-          action: 'validation',
-          details: { error: compiled.error },
-          output: cloneJson(ctx),
-        },
-      ],
-    };
-  }
+  let ctx = coerceInputToCtx(params.ctxInput);
+  const trace: unknown[] = [];
 
-  const { startToEnd, endToStart } = compiled;
-  const steps: unknown[] = [];
-  const whileIterations = new Map<number, number>();
-  const MAX_WHILE_ITERATIONS = 100;
+  for (const stepRaw of params.steps) {
+    const step = isRecord(stepRaw) ? (stepRaw as Record<string, unknown>) : {};
+    const type = typeof step.type === 'string' ? step.type : undefined;
 
-  for (let i = 0; i < params.ops.length; ) {
-    const op = isRecord(params.ops[i]) ? (params.ops[i] as Record<string, unknown>) : {};
-    const action = getAction(op);
+    if (type === 'filter') {
+      const conditionsRaw = Array.isArray(step.conditions) ? step.conditions : [];
+      const conditions = conditionsRaw.filter(isRecord) as Array<Record<string, unknown>>;
 
-    if (action === 'filter.compare') {
-      const actual = getByDotPath(ctx, String(op?.key ?? ''));
-      const passed = evaluateFilterOp({ actual, op: String(op?.condition ?? ''), expected: op?.value });
-      steps.push({
-        action: 'filter.compare',
+      let passed = true;
+      const details = conditions.map((c) => {
+        const path = typeof c.path === 'string' ? c.path : '';
+        const op = typeof c.op === 'string' ? c.op : '';
+        const expected = c.value;
+        const actual = getByDotPath(ctx, path);
+        const conditionPassed = evaluateFilterOp({ actual, op, expected });
+        if (!conditionPassed) passed = false;
+        return { path, op, value: expected, actual, passed: conditionPassed };
+      });
+
+      trace.push({
+        action: 'filter',
         passed,
-        details: { key: op?.key, condition: op?.condition, expected: op?.value, actual },
+        details: { conditions: details },
         output: cloneJson(ctx),
       });
+
       if (!passed) break;
-      i++;
       continue;
     }
 
-    if (action === 'transform.default_value') {
-      const key = String(op?.key ?? '');
-      const current = getByDotPath(ctx, key);
-      const isEmpty = current === null || current === undefined || (typeof current === 'string' && current === '');
-      if (isEmpty) setByDotPath(ctx, key, op?.value);
-      steps.push({ action: 'transform.default_value', details: { key }, output: cloneJson(ctx) });
-      i++;
+    if (type === 'transform') {
+      const opsRaw = Array.isArray(step.ops) ? step.ops : [];
+      const ops = opsRaw.filter(isRecord) as Array<Record<string, unknown>>;
+      const opSummaries: Array<Record<string, unknown>> = [];
+
+      for (const op of ops) {
+        const opType = typeof op.op === 'string' ? op.op : undefined;
+        if (!opType) continue;
+
+        if (opType === 'default') {
+          const path = typeof op.path === 'string' ? op.path : '';
+          const current = getByDotPath(ctx, path);
+          const isEmpty = current === null || current === undefined || (typeof current === 'string' && current === '');
+          if (isEmpty) setByDotPath(ctx, path, op.value);
+          opSummaries.push({ op: 'default', path });
+          continue;
+        }
+
+        if (opType === 'template') {
+          const to = typeof op.to === 'string' ? op.to : '';
+          const template = typeof op.template === 'string' ? op.template : '';
+          setByDotPath(ctx, to, renderTemplate(template, ctx));
+          opSummaries.push({ op: 'template', to });
+          continue;
+        }
+
+        if (opType === 'pick') {
+          const paths = Array.isArray(op.paths) ? op.paths.map(String) : [];
+          ctx = pickDotPaths(ctx, paths);
+          opSummaries.push({ op: 'pick', paths });
+          continue;
+        }
+
+        opSummaries.push({ op: opType, note: 'Unsupported op in docs runner' });
+      }
+
+      trace.push({ action: 'transform', details: { ops: opSummaries }, output: cloneJson(ctx) });
       continue;
     }
 
-    if (action === 'transform.replace_template') {
-      const key = String(op?.key ?? '');
-      const value = String(op?.value ?? '');
-      const rendered = renderTemplate(value, ctx);
-      setByDotPath(ctx, key, rendered);
-      steps.push({ action: 'transform.replace_template', details: { key }, output: cloneJson(ctx) });
-      i++;
-      continue;
-    }
-
-    if (action === 'transform.pick') {
-      const keys = Array.isArray(op?.value) ? op.value.map(String) : [];
-      const picked = pickDotPaths(ctx, keys);
-      steps.push({ action: 'transform.pick', details: { keys }, output: cloneJson(picked) });
-      return { output: cloneJson(picked), workflowExecutionSteps: steps };
-    }
-
-    if (action === 'send.http_request') {
+    if (type === 'http_request') {
+      const url = typeof step.url === 'string' ? step.url : '';
+      const method = typeof step.method === 'string' ? step.method : undefined;
       const bodyMode =
-        isRecord(op.body) && typeof (op.body as Record<string, unknown>).mode === 'string'
-          ? String((op.body as Record<string, unknown>).mode)
+        isRecord(step.body) && typeof (step.body as Record<string, unknown>).mode === 'string'
+          ? String((step.body as Record<string, unknown>).mode)
           : undefined;
-      const url = typeof op.url === 'string' ? op.url : '';
-      const method = typeof op.method === 'string' ? op.method : undefined;
-      steps.push({
-        action: 'send.http_request',
+
+      trace.push({
+        action: 'http_request',
         details: {
           dryRun: true,
           request: { method, url, bodyMode },
@@ -285,118 +242,17 @@ function runDocWorkflow(params: {
         },
         output: cloneJson(ctx),
       });
-      i++;
+
+      // Mirror server behavior: headers/body can be templated, but we do not execute the request here.
+      void deepTemplate(step.headers, ctx);
+      void deepTemplate(step.body, ctx);
       continue;
     }
 
-    if (action === 'if.start') {
-      const actual = getByDotPath(ctx, String(op?.key ?? ''));
-      const conditionMatched = evaluateFilterOp({ actual, op: String(op?.condition ?? ''), expected: op?.value });
-      const end = startToEnd.get(i);
-      steps.push({
-        action: 'if.start',
-        valid: true,
-        details: { key: op?.key, condition: op?.condition, expected: op?.value, actual, conditionMatched },
-        output: cloneJson(ctx),
-      });
-      if (!conditionMatched) {
-        if (end !== undefined) {
-          steps.push({ action: 'if.end', valid: true, details: { skipped: true }, output: cloneJson(ctx) });
-          i = end + 1;
-        } else {
-          i = params.ops.length;
-        }
-        continue;
-      }
-      i++;
-      continue;
-    }
-
-    if (action === 'if.end') {
-      steps.push({ action: 'if.end', valid: true, details: {}, output: cloneJson(ctx) });
-      i++;
-      continue;
-    }
-
-    if (action === 'while.start') {
-      const actual = getByDotPath(ctx, String(op?.key ?? ''));
-      const conditionMatched = evaluateFilterOp({ actual, op: String(op?.condition ?? ''), expected: op?.value });
-      const iteration = whileIterations.get(i) ?? 0;
-      const end = startToEnd.get(i);
-      steps.push({
-        action: 'while.start',
-        valid: true,
-        details: { key: op?.key, condition: op?.condition, expected: op?.value, actual, iteration, conditionMatched },
-        output: cloneJson(ctx),
-      });
-
-      if (!conditionMatched) {
-        whileIterations.delete(i);
-        if (end !== undefined) {
-          steps.push({ action: 'while.end', valid: true, details: { skipped: true, iterations: iteration }, output: cloneJson(ctx) });
-          i = end + 1;
-        } else {
-          i = params.ops.length;
-        }
-        continue;
-      }
-
-      i++;
-      continue;
-    }
-
-    if (action === 'while.end') {
-      const start = endToStart.get(i);
-      if (start === undefined) {
-        steps.push({ action: 'while.end', valid: false, details: { error: 'while.end has no matching while.start' }, output: cloneJson(ctx) });
-        break;
-      }
-
-      const next = (whileIterations.get(start) ?? 0) + 1;
-      whileIterations.set(start, next);
-      steps.push({ action: 'while.end', valid: true, details: { iteration: next }, output: cloneJson(ctx) });
-      if (next >= MAX_WHILE_ITERATIONS) break;
-      i = start;
-      continue;
-    }
-
-    if (action === 'create_or_update') {
-      const key = String(op?.key ?? '');
-      const before = getByDotPath(ctx, key);
-
-      const inc = typeof op?.increment_by === 'number' ? op.increment_by : Number(String(op?.increment_by ?? '').trim());
-      const def = typeof op?.default_value === 'number' ? op.default_value : Number(String(op?.default_value ?? '').trim());
-
-      if (!Number.isFinite(inc) || !Number.isFinite(def)) {
-        steps.push({ action: 'create_or_update', details: { key, error: 'increment_by/default_value must be numeric' }, output: cloneJson(ctx) });
-        break;
-      }
-
-      if (before === null || before === undefined) {
-        setByDotPath(ctx, key, def);
-        steps.push({ action: 'create_or_update', details: { key, created: true, default_value: def }, output: cloneJson(ctx) });
-        i++;
-        continue;
-      }
-
-      const beforeNum = typeof before === 'number' ? before : Number(String(before).trim());
-      if (!Number.isFinite(beforeNum)) {
-        steps.push({ action: 'create_or_update', details: { key, error: 'existing value is not numeric', before }, output: cloneJson(ctx) });
-        break;
-      }
-
-      const after = beforeNum + inc;
-      setByDotPath(ctx, key, after);
-      steps.push({ action: 'create_or_update', details: { key, created: false, before: beforeNum, increment_by: inc, after }, output: cloneJson(ctx) });
-      i++;
-      continue;
-    }
-
-    steps.push({ action: String(action ?? 'unknown'), details: { note: 'Unsupported operation in docs runner' }, output: cloneJson(ctx) });
-    i++;
+    trace.push({ action: String(type ?? 'unknown'), details: { note: 'Unsupported step type in docs runner' }, output: cloneJson(ctx) });
   }
 
-  return { output: cloneJson(ctx), workflowExecutionSteps: steps };
+  return { output: cloneJson(ctx), workflowExecutionSteps: trace };
 }
 
 export function OperationsPage(): ReactNode {
@@ -425,20 +281,20 @@ export function OperationsPage(): ReactNode {
     setSlackTestResult(null);
     setSlackTestBusy(false);
     setSlackTestText('test');
-    if (selected.id !== 'send.http_request') {
+    if (selected.id !== 'http_request') {
       setSlackTestUrl('');
     }
   }, [selectedId, selected.sampleInput]);
 
   useEffect(() => {
-    if (selected.id !== 'send.http_request') return;
+    if (selected.id !== 'http_request') return;
     try {
       const parsed: unknown = JSON.parse(tryUsageText);
-      const opCandidate = Array.isArray(parsed)
-        ? parsed.find((x) => getAction(x) === 'send.http_request' || getAction(x) === 'fetch.http_request')
+      const stepCandidate = Array.isArray(parsed)
+        ? parsed.find((x) => isRecord(x) && (x as Record<string, unknown>).type === 'http_request')
         : parsed;
-      const op = isRecord(opCandidate) ? opCandidate : null;
-      const url = typeof op?.url === 'string' ? op.url : '';
+      const step = isRecord(stepCandidate) ? stepCandidate : null;
+      const url = typeof step?.url === 'string' ? step.url : '';
       if (url) setSlackTestUrl(url);
     } catch {
       // ignore
@@ -467,16 +323,14 @@ export function OperationsPage(): ReactNode {
     try {
       const usage = JSON.parse(tryUsageText) as unknown;
       const input = JSON.parse(tryInputText) as unknown;
-      const ops = Array.isArray(usage) ? usage : [usage];
-      return runDocWorkflow({ ops, input });
+      const steps = Array.isArray(usage) ? usage : [usage];
+      return runDocWorkflow({ steps, ctxInput: input });
     } catch {
       return null;
     }
   }, [tryInputText, tryUsageText]);
 
   const listIdsForDoc = (doc: OperationDoc): string[] => {
-    if (doc.id === 'if.start') return ['if.start', 'if.end'];
-    if (doc.id === 'while.start') return ['while.start', 'while.end'];
     return [doc.id];
   };
 
@@ -548,7 +402,7 @@ export function OperationsPage(): ReactNode {
                   {id}
                 </div>
               ))}
-              <div className={styles.listButtonKind}>Operation</div>
+              <div className={styles.listButtonKind}>Step</div>
             </button>
           ))}
         </div>
@@ -599,7 +453,7 @@ export function OperationsPage(): ReactNode {
             </pre>
           </div>
 
-          {selected.id === 'send.http_request' ? (
+          {selected.id === 'http_request' ? (
             <div className={styles.notes}>
               {OPERATIONS_PAGE_TEXT.sendHttpNotesPrefix} {OPERATIONS_PAGE_TEXT.sendHttpNotes}
 

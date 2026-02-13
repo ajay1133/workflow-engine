@@ -15,6 +15,13 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
+      watch:
+        process.platform === 'win32'
+          ? {
+              usePolling: true,
+              interval: 100,
+            }
+          : undefined,
     },
   };
 });

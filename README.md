@@ -3,9 +3,9 @@
 ## Repo Description
 This repo is a small “Zapier-like” workflow app.
 
-You create a workflow (a JSON list of operations), get a unique HTTP trigger URL, and when that URL is called the workflow is queued and executed operation-by-operation. Each run is persisted (status, outputs, errors), and there’s a simple UI to create/edit workflows and view run history.
+You create a workflow (JSON steps), get a unique HTTP trigger URL, and when that URL is called the workflow is queued and executed step-by-step. Each run is persisted (status, outputs, errors), and there’s a simple UI to create/edit workflows and view run history.
 
-Workflows are defined as a JSON list of **operations** (flat array). Each operation reads/writes the shared Input object (mutated as it flows through operations).
+Workflows are defined as an ordered list of **steps**. Each step has a `type` and reads/writes the shared `ctx` object (mutated as it flows through steps).
 
 A queue is used to track the order of requests which keeps HTTP triggers fast and reliable: the request enqueues work and a worker processes jobs sequentially.
 
@@ -111,172 +111,116 @@ To enable queueing via LocalStack SQS again, set both:
 
 Or run the automated PowerShell script:
 
-## Operations
+## Steps
 
-Workflows are a flat list of operations. Each operation reads/writes the shared `Input` object (JSON).
+Workflows are defined as an ordered list of steps. Each step reads/writes the shared `ctx` object (JSON).
 
-Common sample input used below:
+Dot-paths:
 
-```json
-{ "key": "test", "value": "test" }
-```
+- Use dotted paths like `body.message` to read/write nested values.
+- Arrays can be indexed with numeric segments like `orders.0.status` (bracket notation is not supported).
 
-### filter.compare
-Gates execution based on `Input[key]` compared to a value. If it fails, the workflow run is **skipped**.
-
-Usage:
-
-```json
-{ "action": "filter.compare", "key": "key", "condition": "eq", "value": "test" }
-```
-
-Sample output (execution step):
-
-```json
-{
-	"action": "filter.compare",
-	"passed": true,
-	"details": { "key": "key", "condition": "eq", "expected": "test", "actual": "test" },
-	"output": { "key": "test", "value": "test" }
-}
-```
-
-### transform.default_value
-Sets `Input[key]` only when the current value is empty (`null`, `undefined`, or `""`).
-
-Usage:
-
-```json
-{ "action": "transform.default_value", "key": "value", "value": "test" }
-```
-
-Sample input / output:
-
-```json
-{ "key": "test", "value": "" }
-```
-
-```json
-{ "key": "test", "value": "test" }
-```
-
-### transform.replace_template
-Renders a template string using `{{dot.path}}` lookups and writes it to `Input[key]`.
-
-Usage:
-
-```json
-{ "action": "transform.replace_template", "key": "title", "value": "Replace {{key}} by {{value}}" }
-```
-
-Sample output:
-
-```json
-{ "key": "test", "value": "test", "title": "Replace test by test" }
-```
-
-### transform.pick
-Replaces the `Input` object with a new object containing only the listed dot-path keys.
-
-Usage:
-
-```json
-{ "action": "transform.pick", "value": ["key", "value"] }
-```
-
-### send.http_request
-Posts a message to a Slack incoming webhook; supports templated headers/body, `timeoutMs`, and `retries`.
-
-Retry behavior:
+### filter
+Gates execution based on conditions evaluated against `ctx`. If any condition fails, the workflow run is **skipped**.
 
 Usage:
 
 ```json
 {
-	"action": "send.http_request",
-	"method": "POST",
-	"url": "https://hooks.slack.com/services/...",
-	"headers": { "content-type": "application/json" },
-	"body": { "mode": "custom", "value": { "text": "{{value}}" } },
-	"timeoutMs": 5000,
-	"retries": 2
+	"type": "filter",
+	"conditions": [
+		{ "path": "key", "op": "eq", "value": "test" },
+		{ "path": "value", "op": "neq", "value": "" }
+	]
 }
 ```
 
 Notes:
 
-Sample output (execution step excerpt):
+- Only `eq` and `neq` are supported.
 
-```json
-{
-	"action": "send.http_request",
-	"details": {
-		"response": { "ok": false, "status": 500, "attempts": 3, "retriesUsed": 2 }
-	},
-	"output": { "send_http_retries_used": 2 }
-}
-```
+### transform
+Applies a list of transform ops to `ctx` sequentially:
 
-### if.start / if.end
-Conditional block. Steps between `if.start` and `if.end` run only when the condition passes.
-
-Usage (paired block):
-
-```json
-[
-	{ "action": "if.start", "key": "key", "condition": "eq", "value": "test" },
-	{ "action": "transform.default_value", "key": "value", "value": "test" },
-	{ "action": "if.end" }
-]
-```
-
-Security note: Slack incoming webhook URLs are secrets. Don’t commit them to git or paste them into logs.
-
-### while.start / while.end
-Loop block. Steps between `while.start` and `while.end` run repeatedly while the condition passes.
-
-Usage (paired block):
-
-```json
-[
-	{ "action": "while.start", "key": "counter", "condition": "lt", "value": 3 },
-	{ "action": "create_or_update", "key": "counter", "increment_by": 1, "default_value": 0 },
-	{ "action": "while.end" }
-]
-```
-
-### create_or_update
-Sets `Input[key]` to `default_value` if missing; otherwise increments it by `increment_by`.
+- `default`: set `ctx[path]` only when empty (`null`, `undefined`, or `""`)
+- `template`: render a template string using `{{dot.path}}` lookups and write to `to`
+- `pick`: replace `ctx` with an object containing only the selected dot-paths
 
 Usage:
 
 ```json
-{ "action": "create_or_update", "key": "value", "increment_by": 1, "default_value": 0 }
+{
+	"type": "transform",
+	"ops": [
+		{ "op": "default", "path": "value", "value": "test" },
+		{ "op": "template", "to": "title", "template": "Replace {{key}} by {{value}}" },
+		{ "op": "pick", "paths": ["key", "value", "title"] }
+	]
+}
 ```
 
-### Sample workflow (all operations)
+### http_request
+Makes an HTTP request. `headers` and `body` may contain templates like `{{title}}`.
+
+Rule:
+
+- If a workflow includes `http_request`, it must be the **last** step.
+
+Body modes:
+
+- `{ "mode": "ctx" }` sends the entire `ctx` as JSON.
+- `{ "mode": "custom", "value": <any JSON> }` sends templated JSON.
+
+Response metadata is stored in:
+
+- `ctx.http_response`
+- `ctx.http_status`
+- `ctx.http_ok`
+- `ctx.http_retries_used`
+
+Usage:
+
+```json
+{
+	"type": "http_request",
+	"method": "POST",
+	"url": "https://example.com/webhook",
+	"headers": { "content-type": "application/json" },
+	"body": { "mode": "custom", "value": { "text": "{{title}}" } },
+	"timeoutMs": 5000,
+	"retries": 2
+}
+```
+
+Security note: webhook URLs (e.g. Slack incoming webhooks) are secrets. Don’t commit them to git or paste them into logs.
+
+### Sample workflow
 
 ```json
 [
-	{ "action": "filter.compare", "key": "key", "condition": "eq", "value": "test" },
-	{ "action": "transform.default_value", "key": "value", "value": "test" },
-	{ "action": "transform.replace_template", "key": "msg", "value": "Replace {{key}} by {{value}}" },
-	{ "action": "create_or_update", "key": "counter", "increment_by": 0, "default_value": 0 },
-	{ "action": "while.start", "key": "counter", "condition": "lt", "value": 3 },
-	{ "action": "create_or_update", "key": "counter", "increment_by": 1, "default_value": 0 },
-	{ "action": "while.end" },
-	{ "action": "if.start", "key": "counter", "condition": "eq", "value": 3 },
 	{
-		"action": "send.http_request",
+		"type": "filter",
+		"conditions": [
+			{ "path": "key", "op": "eq", "value": "test" },
+			{ "path": "value", "op": "neq", "value": "" }
+		]
+	},
+	{
+		"type": "transform",
+		"ops": [
+			{ "op": "default", "path": "value", "value": "test" },
+			{ "op": "template", "to": "title", "template": "Replace {{key}} by {{value}}" }
+		]
+	},
+	{
+		"type": "http_request",
 		"method": "POST",
-		"url": "https://hooks.slack.com/services/...",
+		"url": "https://example.com/webhook",
 		"headers": { "content-type": "application/json" },
-		"body": { "mode": "custom", "value": { "text": "{{msg}}" } },
+		"body": { "mode": "custom", "value": { "text": "{{title}}" } },
 		"timeoutMs": 5000,
 		"retries": 2
-	},
-	{ "action": "if.end" },
-	{ "action": "transform.pick", "value": ["key", "value", "msg", "counter", "send_http_ok", "send_http_status"] }
+	}
 ]
 ```
 
@@ -284,14 +228,14 @@ Usage:
 
 ### Run history API
 
-### Example: webhook operation
-You can send notifications via the `send.http_request` operation.
+### Example: webhook step
+You can send notifications via the `http_request` step.
 
 ```json
 [
-	{ "action": "transform.replace_template", "key": "msg", "value": "Replace {{key}} by {{value}}" },
+	{ "type": "transform", "ops": [{ "op": "template", "to": "msg", "template": "Replace {{key}} by {{value}}" }] },
 	{
-		"action": "send.http_request",
+		"type": "http_request",
 		"method": "POST",
 		"url": "https://hooks.slack.com/services/...",
 		"headers": { "content-type": "application/json" },
@@ -301,8 +245,6 @@ You can send notifications via the `send.http_request` operation.
 	}
 ]
 ```
-
-Note: `send.http_request.url` must contain the Slack incoming webhook URL directly.
 
 Sample input:
 

@@ -2,7 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { API_PREFIX, ROUTES } from './constants';
+import { API_PREFIX, ENV_KEYS, ROUTES } from './constants';
 import type { PrismaClient } from '@prisma/client';
 import type { AppEnv } from './env';
 import type { SQSClient } from '@aws-sdk/client-sqs';
@@ -45,9 +45,12 @@ export function createApp(params: {
     }),
   );
 
+  const serveWebDist =
+    params.env[ENV_KEYS.nodeEnv] === 'production' || params.env[ENV_KEYS.serveWebDist] === true;
+
   const webDistDir = path.resolve(__dirname, '../../web/dist');
   const indexHtml = path.join(webDistDir, 'index.html');
-  if (fs.existsSync(indexHtml)) {
+  if (serveWebDist && fs.existsSync(indexHtml)) {
     app.use(express.static(webDistDir));
 
     app.get('*', (req, res, next) => {

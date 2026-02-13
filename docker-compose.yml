@@ -44,6 +44,7 @@ services:
     environment:
       PORT: ${PORT:-3000}
       NODE_ENV: ${NODE_ENV:-development}
+      SERVE_WEB_DIST: ${SERVE_WEB_DIST:-true}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
       DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql://postgres:postgres@postgres:5432/workflow_engine}
 

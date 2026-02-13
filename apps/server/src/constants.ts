@@ -13,6 +13,7 @@ export const ROUTES = {
 export const ENV_KEYS = {
   port: 'PORT',
   nodeEnv: 'NODE_ENV',
+  serveWebDist: 'SERVE_WEB_DIST',
   publicBaseUrl: 'PUBLIC_BASE_URL',
   databaseUrl: 'DATABASE_URL',
 
